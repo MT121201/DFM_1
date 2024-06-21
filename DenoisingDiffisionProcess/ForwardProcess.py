@@ -27,3 +27,14 @@ from scipy.ndimage import zoom as scizoom
 from PIL import Image as PILImage
 from kornia.color.gray import rgb_to_grayscale
 import cv2
+
+def clipped_zoom(image, zoom_factor):
+    pass
+
+class Forward_process_based:
+    def forward(self, x, i):
+        pass
+    @torch.no_grad()
+    def reset_parameters(self, batch_size=32):
+        pass
+
