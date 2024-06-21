@@ -242,16 +242,29 @@ class UnetResNetBlock(nn.Module):
                                         padding=1)
 
 
-    def forward(self, x, t=None):
-        assert x.shape[2] == x.shape[3] == self.resolution
-
-        if t is None:
-            assert self.with_time_emb == False
-            t = torch.full((x.shape[0],), 0, dtype=torch.long).to(x.device)
-        # timestep embedding
-        temb = SinusoidalPositionalEmbedding.get_embedding(t, self.ch)
-        temb = self.temb.dense[0](temb)
         temb = torch.relu(temb)
+        temb = self.temb.dense[1](temb)
+
+        # downsampling
+        hs = [self.conv_in(x)]
+        for i_level in range(self.num_resolutions):
+            for i_block in range(self.num_res_blocks):
+                h = self.down[i_level].block[i_block](hs[-1], temb)
+                if len(self.down[i_level].attn) > 0:
+                    h = self.down[i_level].attn[i_block](h)
+                hs.append(h)
+            if i_level != self.num_resolutions-1:
+                hs.append(self.down[i_level].downsample(hs[-1]))
+
+        # middle
+        h = hs[-1]
+        h = self.mid.block_1(h, temb)
+        h = self.mid.attn_1(h)
+        h = self.mid.block_2(h, temb)
+
+        # upsampling
+        for i_level in reversed(range(self.num_resolutions)):
+            for i_block in range(self.num_res_blocks+1):elu(temb)
         temb = self.temb.dense[1](temb)
 
         # downsampling
