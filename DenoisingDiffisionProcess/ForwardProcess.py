@@ -1,6 +1,6 @@
 import torch 
 from torch import nn
-from betas_schedule import *
+from DenoisingDiffisionProcess.beta_schedules import *
 
 class ForwardModel(nn.Module):
     """
