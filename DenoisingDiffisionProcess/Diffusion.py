@@ -31,7 +31,7 @@ from torch import linalg as LA
 import imageio
 from .forward_process_impl import DeColorization, Snow
 from .get_dataset import get_dataset
-from .utils import rgb2lab, lab2rgb
+from ..utils import rgb2lab, lab2rgb
 
 try:
     from apex import amp
