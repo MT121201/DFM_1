@@ -1,40 +1,94 @@
 import math
-import copy
 import torch
-from torch import nn, einsum
+import torch.nn as nn
 import torch.nn.functional as F
 from inspect import isfunction
 from functools import partial
-import time
-
-
-from torch.utils import data
-from pathlib import Path
-from torch.optim import Adam
-from torchvision import transforms, utils
-from torchvision import datasets
-from PIL import Image
-
 import numpy as np
-from tqdm import tqdm
-from einops import rearrange
+from tqdm.auto import tqdm
 
-import pickle
+from .ForwardProcess import *
+from .sampler import *
+from ..Backbone.unet_cvx import *
 
-import torchgeometry as tgm
-import glob
-import os
-from PIL import Image
-import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
-from torch import linalg as LA
-import imageio
-from .forward_process_impl import DeColorization, Snow
-from .get_dataset import get_dataset
-from ..utils import rgb2lab, lab2rgb
+class DenoisingDiffusionProcess(nn.Module):
 
-try:
-    from apex import amp
-    APEX_AVAILABLE = True
-except:
-    APEX_AVAILABLE = False
+    def __init__(
+            self,
+            generated_channels =3,
+            loss_fn = nn.MSELoss(),
+            schedule = 'linear',
+            num_timesteps = 1000,
+            sampler = None
+    ):
+        super().__init__()
+        self.generated_channels = generated_channels
+        self.loss_fn = loss_fn
+        self.num_timesteps = num_timesteps
+        
+        self.forward_process = GaussianForwardProcess(num_timesteps=num_timesteps,
+                                                      schedule=schedule)
+        
+        self.model = UnetConvNextBlock(dim=64,
+                                       dim_mults=(1, 2, 4, 8),
+                                       in_channels=generated_channels,
+                                       out_channels=generated_channels,
+                                       with_time_emb=True)
+        
+        self.sampler = DDIM_Sampler(num_timesteps=self.num_timesteps) if sampler is None else sampler
+
+    @torch.no_grad()
+    def forward(self,
+                shape = (256,256),
+                batch_size =1,
+                sampler =None,
+                verbose = False):
+         
+        """
+            forward() function triggers a complete inference cycle
+            
+            A custom sampler can be provided as an argument!
+        """     
+        b,c,h,w = batch_size, self.generated_channels, *shape
+        device = next(self.model.parameters()).device
+
+        if sampler is not None:
+            self.sampler = sampler
+        else:
+            sampler.to(device)
+
+        #time_step_list
+        num_timesteps = sampler.num_timesteps
+        it = reversed(range(num_timesteps))
+
+        x_t = torch.randn([b, self.generated_channels, h, w], device=device)
+
+        for i in tqdm(it, desc="diffusion sampling", total=num_timesteps) if verbose else it:
+            t = torch.full((b,), i,dtype=torch.long ,device=device)
+            z_t = self.model(x_t, t) #predict noise
+            x_t = self.sampler(x_t, t, z_t) #sample x_t
+
+        return x_t
+    
+    def p_loss(self, output, condition):
+        """
+            Assume loss in [-1,1] range
+        """    
+        b,c,h,w = output.shape
+        device = output.device
+
+        #loss for training
+
+        #input is conditional option
+        t = torch.randint(0,self.forward_process.num_timesteps,(b,),device=device).long()
+        output_noisy, noise = self.forward_process(output, t, return_noise=True)
+
+        #reverse pass
+        model_input = torch.cat([output_noisy, condition],1).to(device)
+        noise_hat = self.model(model_input, t)
+
+        #apply loss
+        return self.loss_fn(noise, noise_hat)
+
+
+    
