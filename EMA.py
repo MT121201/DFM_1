@@ -22,12 +22,12 @@ from pytorch_lightning import Callback
 from pytorch_lightning.utilities import rank_zero_warn
 from pytorch_lightning.utilities.exceptions import MisconfigurationException
 from pytorch_lightning.utilities.types import STEP_OUTPUT
-# try:
-#     import amp_C
+try:
+    import amp_C
 
-#     apex_available = True
-# except Exception:
-#     apex_available = False
+    apex_available = True
+except Exception:
+    apex_available = False
 
 
 class EMA(Callback):
