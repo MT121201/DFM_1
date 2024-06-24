@@ -7,3 +7,4 @@ pip install einops
 pip install fairseq
 pip install local-attention
 pip install torchgeometry, matplotlib, imageio, apex, scipy, kornia
+pip install pytorch_lightning
