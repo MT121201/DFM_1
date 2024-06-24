@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from diffusers.models import AutoencoderKL
 
-from .DenoisingDiffisionProcess import *
+from .DenoisingDiffusionProcess import *
 
 class AutoEncoder(nn.Module):
     def __init__(self,
